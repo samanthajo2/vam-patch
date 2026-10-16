@@ -6,7 +6,8 @@
 # installed: .\release\build-release.ps1 -VamDir "C:\path\to\VaM"
 # None of VaM's files end up in the zips.
 param(
-    [string]$VamDir = 'C:\extra\System17\y\VRelease1.19'
+    [Parameter(Mandatory = $true, HelpMessage = 'Your VaM folder, the one that contains VaM.exe')]
+    [string]$VamDir
 )
 
 $ErrorActionPreference = 'Stop'

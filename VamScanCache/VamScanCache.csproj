@@ -5,8 +5,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <!-- Root of the VaM install; override with -p:VamDir=... -->
-    <VamDir Condition="'$(VamDir)' == ''">C:\extra\System17\y\VRelease1.19</VamDir>
+    <!-- Root of the VaM install (the folder with VaM.exe). Required: pass -p:VamDir=... -->
     <Managed>$(VamDir)\VaM_Data\Managed</Managed>
     <!-- BepInEx core folder to compile against; the release script points this at its pinned download. -->
     <BepInExDir Condition="'$(BepInExDir)' == ''">$(VamDir)\BepInEx\core</BepInExDir>
@@ -22,4 +21,10 @@
     <Reference Include="BepInEx"><HintPath>$(BepInExDir)\BepInEx.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="0Harmony"><HintPath>$(BepInExDir)\0Harmony.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
+  <Target Name="CheckVamDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(VamDir)' == ''"
+           Text="Set VamDir to your VaM folder (the one with VaM.exe): dotnet build VamScanCache -c Release -p:VamDir=&quot;C:\path\to\VaM&quot;" />
+    <Error Condition="'$(VamDir)' != '' And !Exists('$(Managed)\Assembly-CSharp.dll')"
+           Text="VaM's assemblies weren't found under $(VamDir). VamDir must be the folder that contains VaM.exe." />
+  </Target>
 </Project>
