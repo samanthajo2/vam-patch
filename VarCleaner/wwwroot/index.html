@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VaM Package Cleaner</title>
+<style>
+/* Layout: sticky toolbar, a dense thumbnail grid of scene packages, a sticky action bar,
+   and a modal preview of exactly what will move. */
+:root {
+  --bg: #f3f4f6;
+  --surface: #ffffff;
+  --fg: #1d2129;
+  --muted: #646b78;
+  --rule: #d8dce3;
+  --accent: #3a5bd9;
+  --accent-fg: #ffffff;
+  --remove: #c2412b;
+  --remove-soft: #fbe9e5;
+  --ok: #23845e;
+  --warn: #9a6a00;
+  --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161b; --surface: #1d2027; --fg: #e5e8ee; --muted: #9aa1ae; --rule: #2e333d;
+    --accent: #8ba4ff; --accent-fg: #10131a; --remove: #ff8a73; --remove-soft: #3a1f1a;
+    --ok: #5cc79a; --warn: #e2b54c; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--font); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1400px; margin: 0 auto; padding-inline: 16px; }
+
+header { padding-block: 20px 12px; display: flex; flex-direction: column; gap: 6px; }
+h1 { margin: 0; font-size: 1.5rem; font-weight: 600; }
+.sub { color: var(--muted); margin: 0; max-width: 80ch; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats b { color: var(--fg); font-weight: 600; }
+
+.toolbar { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--rule); }
+.toolbar .wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-block: 10px; }
+.toolbar input[type=search] { flex: 1 1 240px; min-width: 0; padding: 7px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+.toolbar select, .btn { padding: 7px 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.btn.danger { background: var(--remove); color: #fff; border-color: var(--remove); font-weight: 600; }
+.btn:disabled { opacity: .5; cursor: default; }
+.shown { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; padding-block: 14px 110px; }
+.card { position: relative; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; cursor: pointer; content-visibility: auto; contain-intrinsic-size: 190px 250px; }
+.card input { position: absolute; opacity: 0; pointer-events: none; }
+.card:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.thumb { aspect-ratio: 1 / 1; width: 100%; object-fit: cover; background: var(--rule); display: block; }
+.noimg { aspect-ratio: 1 / 1; display: grid; place-items: center; color: var(--muted); background: var(--rule); font-size: 12px; }
+.body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.title { font-weight: 600; overflow-wrap: anywhere; line-height: 1.3; }
+.by, .meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.badge { position: absolute; top: 8px; right: 8px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface); color: var(--muted); border: 1px solid var(--rule); }
+.card.removing { border-color: var(--remove); background: var(--remove-soft); }
+.card.removing .thumb { filter: grayscale(1) opacity(.55); }
+.card.removing .badge { background: var(--remove); color: #fff; border-color: var(--remove); }
+
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--surface); border-top: 1px solid var(--rule); }
+.bar .wrap { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding-block: 12px; }
+.bar .count { font-variant-numeric: tabular-nums; }
+
+.loading { padding-block: 60px; display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
+progress { width: 100%; height: 10px; }
+
+dialog { width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); color: var(--fg); }
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+.dlg { display: flex; flex-direction: column; gap: 14px; padding: 20px; }
+.dlg h2 { margin: 0; font-size: 1.25rem; }
+.big { font-size: 1.1rem; }
+.option { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 8px; }
+.option input { margin-top: 4px; }
+.option small { display: block; color: var(--muted); }
+details { border: 1px solid var(--rule); border-radius: 8px; }
+summary { padding: 8px 12px; cursor: pointer; font-weight: 600; }
+.list { max-height: 260px; overflow: auto; border-top: 1px solid var(--rule); }
+.list table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.list td { padding: 5px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; overflow-wrap: anywhere; }
+.list td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.list td.why { color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.msg { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--rule); }
+.msg.warn { border-color: var(--warn); color: var(--warn); }
+.msg.ok { border-color: var(--ok); color: var(--ok); }
+.msg.err { border-color: var(--remove); color: var(--remove); }
+.history { padding-block: 0 120px; display: flex; flex-direction: column; gap: 8px; }
+.history h2 { font-size: 1.1rem; margin: 0; }
+.hrow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>VaM Package Cleaner</h1>
+    <p class="sub">Click scene packages you don't want any more. The preview shows everything that would be moved, and why.
+      Packages are moved to <code>AddonPackages_Removed</code>, not deleted, so you can put them back.</p>
+    <div class="stats" id="stats"></div>
+  </header>
+</div>
+
+<div id="loading" class="wrap loading">
+  <b id="phase">Starting…</b>
+  <progress id="progress"></progress>
+  <span class="sub" id="progressText">The first run reads every package and can take a few minutes. Later runs only re-read packages that changed.</span>
+</div>
+
+<div id="app" hidden>
+  <div class="toolbar">
+    <div class="wrap">
+      <input type="search" id="search" placeholder="Search scene, package or creator" aria-label="Search">
+      <select id="sort" aria-label="Sort">
+        <option value="old">Oldest first</option>
+        <option value="new">Newest first</option>
+        <option value="big">Largest first</option>
+        <option value="name">Name</option>
+        <option value="creator">Creator</option>
+      </select>
+      <select id="filter" aria-label="Show">
+        <option value="all">All scene packages</option>
+        <option value="keep">Keeping</option>
+        <option value="remove">Marked for removal</option>
+      </select>
+      <button class="btn" id="markShown">Mark shown for removal</button>
+      <button class="btn" id="keepShown">Keep shown</button>
+      <span class="shown" id="shown"></span>
+    </div>
+  </div>
+  <div class="wrap"><div class="grid" id="grid"></div></div>
+  <div class="wrap history" id="history"></div>
+  <div class="bar">
+    <div class="wrap">
+      <span class="count" id="count"></span>
+      <button class="btn primary" id="preview">Preview removal</button>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlg"><div class="dlg" id="dlgBody"></div></dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+let lib = null;
+let sel = { removeUids: [], removeUnusedContent: false, removeBroken: [] };
+let removeSet = new Set();
+let shownUids = [];
+let confirmArmed = false;
+
+function fmtBytes(b) {
+  if (b >= 1024 ** 3) return (b / 1024 ** 3).toFixed(1) + ' GB';
+  if (b >= 1024 ** 2) return (b / 1024 ** 2).toFixed(0) + ' MB';
+  return Math.max(1, Math.round(b / 1024)) + ' KB';
+}
+function fmtDate(s) {
+  return new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok && r.status !== 204) throw new Error(path + ' failed: ' + r.status);
+  return r.status === 204 ? null : r.json();
+}
+function post(path, body) {
+  return api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+}
+
+let saveTimer;
+function saveSelections() {
+  sel.removeUids = [...removeSet];
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => api('/api/selections', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sel)
+  }).catch(() => {}), 300);
+}
+
+async function waitForIndex() {
+  for (;;) {
+    const s = await api('/api/status');
+    $('phase').textContent = s.phase;
+    if (s.total) {
+      $('progress').max = s.total;
+      $('progress').value = s.done;
+      $('progressText').textContent = s.done.toLocaleString() + ' of ' + s.total.toLocaleString() + ' packages';
+    }
+    if (s.error) { $('phase').textContent = 'Couldn’t read the library: ' + s.error; return false; }
+    if (s.ready) return true;
+    await new Promise(r => setTimeout(r, 500));
+  }
+}
+
+async function load() {
+  $('app').hidden = true;
+  $('loading').hidden = false;
+  if (!await waitForIndex()) return;
+  lib = await api('/api/library');
+  sel = await api('/api/selections');
+  sel.removeBroken = sel.removeBroken || [];
+  const valid = new Set(lib.scenePackages.map(p => p.uid));
+  removeSet = new Set(sel.removeUids.filter(u => valid.has(u)));
+  const st = lib.stats;
+  $('stats').innerHTML =
+    `<span><b>${st.packages.toLocaleString()}</b> packages, <b>${fmtBytes(st.bytes)}</b></span>` +
+    `<span><b>${st.scenePackages.toLocaleString()}</b> with scenes (${fmtBytes(st.sceneBytes)})</span>` +
+    `<span><b>${st.contentPackages.toLocaleString()}</b> content packs</span>` +
+    (st.broken ? `<span><b>${st.broken}</b> broken</span>` : '') +
+    `<span><b>${st.userRefs.toLocaleString()}</b> packages used by your own files</span>` +
+    `<span><b>${st.favorites.toLocaleString()}</b> with favorites</span>`;
+  document.querySelectorAll('.unreadable').forEach(e => e.remove());
+  if (st.unreadableUserFiles.length) {
+    $('stats').insertAdjacentHTML('afterend', `<div class="msg warn unreadable">Couldn't read
+      ${st.unreadableUserFiles.length} of your own files, so packages they use can't be detected and may be offered
+      for removal: ${st.unreadableUserFiles.slice(0, 5).map(esc).join(', ')}${st.unreadableUserFiles.length > 5 ? ', …' : ''}</div>`);
+  }
+  $('loading').hidden = true;
+  $('app').hidden = false;
+  render();
+  loadHistory();
+}
+
+function matches(p, q) {
+  if (!q) return true;
+  return (p.name + ' ' + p.creator + ' ' + p.uid + ' ' + p.scenes.join(' ')).toLowerCase().includes(q);
+}
+
+function render() {
+  const q = $('search').value.trim().toLowerCase();
+  const f = $('filter').value;
+  let list = lib.scenePackages.filter(p => matches(p, q) &&
+    (f === 'all' || (f === 'remove') === removeSet.has(p.uid)));
+  const sorts = {
+    old: (a, b) => a.modified.localeCompare(b.modified),
+    new: (a, b) => b.modified.localeCompare(a.modified),
+    big: (a, b) => b.size - a.size,
+    name: (a, b) => a.name.localeCompare(b.name),
+    creator: (a, b) => a.creator.localeCompare(b.creator) || a.name.localeCompare(b.name),
+  };
+  list.sort(sorts[$('sort').value]);
+  shownUids = list.map(p => p.uid);
+  $('grid').innerHTML = list.map(card).join('');
+  $('shown').textContent = list.length.toLocaleString() + ' shown';
+  updateCount();
+}
+
+function card(p) {
+  const r = removeSet.has(p.uid);
+  const scenes = p.scenes.length === 1 ? '1 scene' : p.scenes.length + ' scenes';
+  return `<label class="card${r ? ' removing' : ''}" data-uid="${esc(p.uid)}" title="${esc(p.uid + '\n' + p.scenes.join('\n'))}">
+    <input type="checkbox"${r ? ' checked' : ''} aria-label="Remove ${esc(p.name)}">
+    <img class="thumb" loading="lazy" alt="" src="/api/thumb?uid=${encodeURIComponent(p.uid)}" onerror="this.outerHTML='<div class=noimg>No preview</div>'">
+    <span class="badge">${r ? 'Remove' : 'Keep'}</span>
+    <div class="body">
+      <span class="title">${esc(p.name.replace(/_/g, ' '))}</span>
+      <span class="by">${esc(p.creator)} · v${p.version}</span>
+      <span class="meta">${scenes} · ${fmtBytes(p.size)} · ${fmtDate(p.modified)}</span>
+    </div>
+  </label>`;
+}
+
+function setRemoved(uid, on) {
+  if (on) removeSet.add(uid); else removeSet.delete(uid);
+  const el = document.querySelector(`.card[data-uid="${CSS.escape(uid)}"]`);
+  if (el) {
+    el.classList.toggle('removing', on);
+    el.querySelector('input').checked = on;
+    el.querySelector('.badge').textContent = on ? 'Remove' : 'Keep';
+  }
+}
+
+function updateCount() {
+  const bytes = lib.scenePackages.filter(p => removeSet.has(p.uid)).reduce((s, p) => s + p.size, 0);
+  $('count').textContent = removeSet.size
+    ? `${removeSet.size.toLocaleString()} scene packages marked for removal (${fmtBytes(bytes)})`
+    : 'Nothing marked yet. Click a scene package to mark it for removal.';
+}
+
+$('grid').addEventListener('change', e => {
+  const cardEl = e.target.closest('.card');
+  if (!cardEl) return;
+  setRemoved(cardEl.dataset.uid, e.target.checked);
+  updateCount();
+  saveSelections();
+});
+let searchTimer;
+$('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(render, 150); });
+$('sort').addEventListener('change', render);
+$('filter').addEventListener('change', render);
+$('markShown').addEventListener('click', () => { shownUids.forEach(u => setRemoved(u, true)); updateCount(); saveSelections(); });
+$('keepShown').addEventListener('click', () => { shownUids.forEach(u => setRemoved(u, false)); updateCount(); saveSelections(); });
+$('preview').addEventListener('click', openPreview);
+
+function table(rows) {
+  return `<div class="list"><table>${rows.join('')}</table></div>`;
+}
+
+async function openPreview() {
+  confirmArmed = false;
+  $('dlgBody').innerHTML = '<p>Working out what can be removed…</p>';
+  if (!$('dlg').open) $('dlg').showModal();
+  sel.removeUids = [...removeSet];
+  const [plan, status] = await Promise.all([post('/api/plan', sel), api('/api/status')]);
+  const scenes = plan.remove.filter(r => r.hasScenes);
+  const content = plan.remove.filter(r => !r.hasScenes && !r.reason.startsWith('Broken'));
+  const broken = plan.remove.filter(r => r.reason.startsWith('Broken'));
+  const row = r => `<tr><td>${esc(r.uid)}</td><td class="why">${esc(r.reason)}</td><td class="num">${fmtBytes(r.size)}</td></tr>`;
+  let h = `<h2>Preview</h2>`;
+  if (status.vamRunning) h += `<div class="msg warn">VaM is running. Close it before moving packages: it keeps package files open.</div>`;
+  h += `<p class="big">${plan.remove.length
+      ? `<b>${plan.remove.length.toLocaleString()}</b> packages would be moved, freeing <b>${fmtBytes(plan.totalBytes)}</b>.`
+      : 'Nothing would be moved with the current choices.'}
+    ${plan.keptCount.toLocaleString()} packages stay.</p>`;
+  h += `<label class="option"><input type="checkbox" id="optContent"${sel.removeUnusedContent ? ' checked' : ''}>
+    <span>Also remove content packs that nothing you're keeping uses
+    <small>Clothing, hair, morph, asset and plugin packs that no kept scene, preset, favorite or saved file of yours needs.
+    Leave this off if you browse those packs directly in VaM.</small></span></label>`;
+  if (scenes.length) h += `<details open><summary>Scene packages (${scenes.length.toLocaleString()})</summary>${table(scenes.map(row))}</details>`;
+  if (content.length) h += `<details${sel.removeUnusedContent ? ' open' : ''}><summary>Content packs (${content.length.toLocaleString()})</summary>${table(content.map(row))}</details>`;
+  if (plan.blocked.length) h += `<details open><summary>Marked, but can't be removed (${plan.blocked.length})</summary>
+    ${table(plan.blocked.map(b => `<tr><td>${esc(b.uid)}</td><td class="why">${esc(b.keptBecause)}</td></tr>`))}</details>`;
+  if (lib.broken.length) {
+    h += `<details${broken.length ? ' open' : ''}><summary>Broken packages VaM can't use (${lib.broken.length})</summary>${table(lib.broken.map(b =>
+      `<tr><td><label><input type="checkbox" class="brk" value="${esc(b.relPath)}"${sel.removeBroken.includes(b.relPath) ? ' checked' : ''}> ${esc(b.relPath)}</label></td>
+       <td class="why">${esc(b.error)}</td><td class="num">${fmtBytes(b.size)}</td></tr>`))}</details>`;
+  }
+  if (plan.missingRefs.length) h += `<details><summary>Referenced but not installed (${plan.missingRefs.length})</summary>
+    <div class="list"><table>${plan.missingRefs.map(m => `<tr><td>${esc(m)}</td></tr>`).join('')}</table></div></details>`;
+  h += `<div id="result"></div><div class="actions">
+    <button class="btn" id="close">Close</button>
+    <button class="btn danger" id="apply"${plan.remove.length ? '' : ' disabled'}>Move ${plan.remove.length.toLocaleString()} packages</button></div>`;
+  $('dlgBody').innerHTML = h;
+  $('close').onclick = () => $('dlg').close();
+  $('optContent').onchange = e => { sel.removeUnusedContent = e.target.checked; saveSelections(); openPreview(); };
+  document.querySelectorAll('.brk').forEach(cb => cb.onchange = () => {
+    sel.removeBroken = [...document.querySelectorAll('.brk:checked')].map(x => x.value);
+    saveSelections();
+    openPreview();
+  });
+  $('apply').onclick = async () => {
+    if (!confirmArmed) {
+      confirmArmed = true;
+      $('apply').textContent = `Yes, move ${plan.remove.length.toLocaleString()} packages (${fmtBytes(plan.totalBytes)})`;
+      return;
+    }
+    $('apply').disabled = true;
+    $('apply').textContent = 'Moving…';
+    const res = await post('/api/apply', sel);
+    const errs = res.errors.length ? `<div class="msg err">${res.errors.map(esc).join('<br>')}</div>` : '';
+    $('result').innerHTML = (res.moved ? `<div class="msg ok">Moved ${res.moved.toLocaleString()} packages (${fmtBytes(res.bytes)}) to AddonPackages_Removed.</div>` : '') + errs;
+    $('apply').textContent = 'Done';
+    if (res.moved) {
+      removeSet.clear();
+      sel.removeBroken = [];
+      saveSelections();
+      setTimeout(() => { $('dlg').close(); load(); }, 1500);
+    }
+  };
+}
+
+async function loadHistory() {
+  const batches = await api('/api/history');
+  if (!batches.length) { $('history').innerHTML = ''; return; }
+  $('history').innerHTML = `<h2>Moved earlier</h2>` + batches.map(b =>
+    `<div class="hrow"><span>${esc(b.batch)}: ${b.count.toLocaleString()} packages, ${fmtBytes(b.bytes)}</span>
+     <button class="btn" data-batch="${esc(b.batch)}">Put back in AddonPackages</button></div>`).join('');
+  $('history').querySelectorAll('button').forEach(btn => btn.onclick = async () => {
+    btn.disabled = true;
+    btn.textContent = 'Restoring…';
+    const res = await post('/api/restore?batch=' + encodeURIComponent(btn.dataset.batch), {});
+    if (res.errors.length) {
+      btn.textContent = 'Failed';
+      btn.insertAdjacentHTML('beforebegin', `<div class="msg err">${res.errors.map(esc).join('<br>')}</div>`);
+    } else {
+      load();
+    }
+  });
+}
+
+load();
+</script>
+</body>
+</html>
