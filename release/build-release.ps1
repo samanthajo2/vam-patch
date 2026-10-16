@@ -1,10 +1,10 @@
-# Builds the release zips into dist\:
-#   VamScanCache-<version>.zip              BepInEx + plugin, unzip into the VaM folder
-#   VamScanCache-<version>-plugin-only.zip  just the plugin, for people who already use BepInEx
+# Builds the release zip, dist\VamScanCache-<version>.zip: BepInEx plus the plugin,
+# laid out to unzip into the VaM folder. People who already use BepInEx copy just
+# BepInEx\plugins\VamScanCache.dll out of it (see INSTALL-VamScanCache.txt).
 #
 # Compiling the plugin needs VaM's own assemblies, so this runs on a machine with VaM
 # installed: .\release\build-release.ps1 -VamDir "C:\path\to\VaM"
-# None of VaM's files end up in the zips.
+# None of VaM's files end up in the zip.
 param(
     [Parameter(Mandatory = $true, HelpMessage = 'Your VaM folder, the one that contains VaM.exe')]
     [string]$VamDir
@@ -55,13 +55,6 @@ Copy-Item $pluginDll (Join-Path $full 'BepInEx\plugins')
 Copy-Item (Join-Path $PSScriptRoot 'INSTALL-VamScanCache.txt') (Join-Path $full 'INSTALL-VamScanCache.txt')
 Copy-Item (Join-Path $root 'licenses\BepInEx-LICENSE.txt') (Join-Path $full 'LICENSES')
 Compress-Archive -Path (Join-Path $full '*') -DestinationPath (Join-Path $dist "VamScanCache-$version.zip")
-
-# Plugin-only zip
-$only = Join-Path $dist 'stage\plugin-only'
-New-Item -ItemType Directory -Force (Join-Path $only 'BepInEx\plugins') | Out-Null
-Copy-Item $pluginDll (Join-Path $only 'BepInEx\plugins')
-Copy-Item (Join-Path $PSScriptRoot 'INSTALL-VamScanCache.txt') $only
-Compress-Archive -Path (Join-Path $only '*') -DestinationPath (Join-Path $dist "VamScanCache-$version-plugin-only.zip")
 
 Remove-Item -Recurse -Force (Join-Path $dist 'stage'), (Join-Path $dist 'download')
 Get-ChildItem $dist | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize

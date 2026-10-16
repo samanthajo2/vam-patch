@@ -57,9 +57,9 @@ into may have changed.
 3. Launch VaM as usual. The first launch builds the cache and is no faster than
    normal. Every launch after that uses it.
 
-If you already use BepInEx for other mods, use
-`VamScanCache-<version>-plugin-only.zip` instead. It only adds
-`BepInEx\plugins\VamScanCache.dll`.
+If you already use BepInEx for other mods, don't unzip everything. Copy only
+`BepInEx\plugins\VamScanCache.dll` from the zip into your VaM folder's
+`BepInEx\plugins`, so your existing BepInEx stays as it is.
 
 To turn it off, delete `BepInEx/plugins/VamScanCache.dll`, or delete
 `winhttp.dll` to disable BepInEx entirely. To remove everything, also delete
@@ -331,15 +331,15 @@ you turn them on.
 
 Building needs the .NET SDK and an installed copy of VaM, because the plugin
 compiles against VaM's own assemblies. None of VaM's files are copied into the
-build or the release zips.
+build or the release zip.
 
 - Plugin only: `dotnet build VamScanCache -c Release -p:VamDir=<VaM folder>`,
   then copy `VamScanCache/bin/Release/net35/VamScanCache.dll` to
   `BepInEx/plugins/`.
-- Release zips: `.\release\build-release.ps1 -VamDir <VaM folder>` builds both
-  zips into `dist\`. It downloads a pinned BepInEx release and checks its
-  SHA-256 before bundling it.
+- Release zip: `.\release\build-release.ps1 -VamDir <VaM folder>` builds
+  `dist\VamScanCache-<version>.zip`. It downloads a pinned BepInEx release and
+  checks its SHA-256 before bundling it.
 
-The release zips can't be built by GitHub Actions without VaM's assemblies, and
-those aren't published in this repo. They're built locally and attached to a
-GitHub release.
+The release zip can't be built by GitHub Actions without VaM's assemblies, and
+those aren't published in this repo. It's built locally and attached to a GitHub
+release.

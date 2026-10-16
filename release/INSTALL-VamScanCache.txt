@@ -20,8 +20,9 @@ You should see a line like:
 
 IF YOU ALREADY USE BEPINEX
 
-Use the "plugin-only" zip instead. It only contains
-BepInEx\plugins\VamScanCache.dll, so it won't replace your BepInEx.
+Don't unzip everything. Copy only BepInEx\plugins\VamScanCache.dll
+from this zip into the BepInEx\plugins folder in your VaM folder. That
+way your existing BepInEx and its settings stay as they are.
 
 
 UNINSTALL
