@@ -1,0 +1,61 @@
+VamScanCache - faster Virt-A-Mate startup and scene loading
+============================================================
+
+INSTALL
+
+1. Close VaM.
+2. Unzip everything in this zip into your VaM folder, the one that
+   contains VaM.exe. When Windows asks, choose "Replace the files in
+   the destination".
+3. Start VaM the way you normally do.
+
+The first launch builds the cache and takes as long as usual. After
+that, launches are much faster.
+
+To check it's working, open BepInEx\LogOutput.log in your VaM folder.
+You should see a line like:
+
+  [Info   :VaM Scan Cache] Refresh ... (cache hits 10005, misses 0 ...)
+
+
+IF YOU ALREADY USE BEPINEX
+
+Use the "plugin-only" zip instead. It only contains
+BepInEx\plugins\VamScanCache.dll, so it won't replace your BepInEx.
+
+
+UNINSTALL
+
+To turn the plugin off: delete BepInEx\plugins\VamScanCache.dll.
+
+To remove everything this zip added: delete winhttp.dll,
+doorstop_config.ini, .doorstop_version, changelog.txt and the BepInEx
+folder from your VaM folder. (If you used BepInEx before, only delete
+BepInEx\plugins\VamScanCache.dll.)
+
+
+SETTINGS
+
+After the first launch, settings are in
+BepInEx\config\VamScanCache.cfg. Each speedup can be turned off on its
+own by setting it to false.
+
+
+AFTER A VAM UPDATE
+
+A VaM update can change the parts of VaM this plugin hooks into. If
+anything looks wrong after updating VaM, delete
+BepInEx\plugins\VamScanCache.dll and check for a newer version.
+
+
+SUPPORTED VAM VERSION
+
+This was tested with VaM 1.22.0.13. On other VaM versions it still
+runs, but writes a warning to BepInEx\LogOutput.log, because the parts
+of VaM it hooks into may have changed.
+
+
+LICENSES
+
+BepInEx is included under the MIT license; see
+LICENSES\BepInEx-LICENSE.txt.

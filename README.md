@@ -37,15 +37,29 @@ The test scene is `Zero Lambda.Autumn_Reverie.1`. It has 169 atoms (one Person,
 67 props, about 20 plugin scripts) and depends on 111 other packages. Tests were
 run on Windows 11 in desktop mode.
 
+## Supported VaM version
+
+This was written and tested against **VaM 1.22.0.13** (Unity 2018.1.9). That
+build's `VaM_Data\Managed\Assembly-CSharp.dll` has SHA-256
+`b368d7a6bf3c2a51861741d26c13a0e92e687db55c99c6285320717d7e4978db`.
+
+The plugin checks this when VaM starts. On any other build it still runs, but it
+writes a warning to `BepInEx\LogOutput.log`, because the parts of VaM it hooks
+into may have changed.
+
 ## Install
 
-1. Install [BepInEx 5](https://github.com/BepInEx/BepInEx/releases) (win x64)
-   into the VaM folder: put `winhttp.dll`, `doorstop_config.ini` and `BepInEx/`
-   next to `VaM.exe`.
-2. Build: `dotnet build VamScanCache -c Release -p:VamDir=<path to VaM folder>`
-3. Copy `VamScanCache/bin/Release/net35/VamScanCache.dll` to `BepInEx/plugins/`.
-4. Launch VaM as usual. The first launch builds the cache and is no faster than
+1. Download `VamScanCache-<version>.zip` from the releases page.
+2. Close VaM, then unzip everything in it into your VaM folder (the one that
+   contains `VaM.exe`). It includes
+   [BepInEx 5](https://github.com/BepInEx/BepInEx), which is what loads the
+   plugin.
+3. Launch VaM as usual. The first launch builds the cache and is no faster than
    normal. Every launch after that uses it.
+
+If you already use BepInEx for other mods, use
+`VamScanCache-<version>-plugin-only.zip` instead. It only adds
+`BepInEx\plugins\VamScanCache.dll`.
 
 To turn it off, delete `BepInEx/plugins/VamScanCache.dll`, or delete
 `winhttp.dll` to disable BepInEx entirely. To remove everything, also delete
@@ -312,3 +326,20 @@ you turn them on.
   crashed VaM once.
 - **`SelfTest`**: after startup, reads random files from cache-built packages
   and checks they come back correct.
+
+## Building from source
+
+Building needs the .NET SDK and an installed copy of VaM, because the plugin
+compiles against VaM's own assemblies. None of VaM's files are copied into the
+build or the release zips.
+
+- Plugin only: `dotnet build VamScanCache -c Release -p:VamDir=<VaM folder>`,
+  then copy `VamScanCache/bin/Release/net35/VamScanCache.dll` to
+  `BepInEx/plugins/`.
+- Release zips: `.\release\build-release.ps1 -VamDir <VaM folder>` builds both
+  zips into `dist\`. It downloads a pinned BepInEx release and checks its
+  SHA-256 before bundling it.
+
+The release zips can't be built by GitHub Actions without VaM's assemblies, and
+those aren't published in this repo. They're built locally and attached to a
+GitHub release.

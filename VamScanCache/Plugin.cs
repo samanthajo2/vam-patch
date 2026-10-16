@@ -33,9 +33,15 @@ namespace VamScanCache
         internal static ConfigEntry<string> TimeMethods;
         internal static ConfigEntry<string> DeepProfileTypes;
 
+        // The VaM build these patches were written and tested against: VaM 1.22.0.13,
+        // identified by the SHA-256 of its VaM_Data/Managed/Assembly-CSharp.dll.
+        public const string TestedVamVersion = "1.22.0.13";
+        const string TestedAssemblySha256 = "b368d7a6bf3c2a51861741d26c13a0e92e687db55c99c6285320717d7e4978db";
+
         void Awake()
         {
             Log = Logger;
+            CheckVamVersion();
             CacheEnabled = Config.Bind("General", "CacheEnabled", true,
                 "Use the .var scan cache. false = original VaM behavior (timings are still logged, for comparison).");
             FastNames = Config.Bind("General", "FastNames", true,
@@ -76,6 +82,33 @@ namespace VamScanCache
                 Application.logMessageReceivedThreaded += LoadProfiler.Log;
             }
             Log.LogInfo("Patched. CacheEnabled=" + CacheEnabled.Value + " FastNames=" + FastNames.Value + " BatchAnatomy=" + BatchAnatomy.Value + " PluginCompileCache=" + PluginCompileCacheEnabled.Value + " ProfileLoads=" + ProfileLoads.Value);
+        }
+
+        static void CheckVamVersion()
+        {
+            try
+            {
+                string path = typeof(SuperController).Assembly.Location;
+                string hash;
+                using (var sha = new System.Security.Cryptography.SHA256Managed())
+                using (var fs = File.OpenRead(path))
+                {
+                    hash = System.BitConverter.ToString(sha.ComputeHash(fs)).Replace("-", "").ToLowerInvariant();
+                }
+                if (hash != TestedAssemblySha256)
+                {
+                    Log.LogWarning("This VaM build is different from the one VamScanCache was tested with (VaM " + TestedVamVersion
+                        + "). The patches may not apply or may misbehave. If anything looks wrong, remove BepInEx/plugins/VamScanCache.dll.");
+                }
+                else
+                {
+                    Log.LogInfo("VaM build matches the tested version (VaM " + TestedVamVersion + ")");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.LogWarning("Could not check the VaM version: " + ex.Message);
+            }
         }
 
         void Update()
